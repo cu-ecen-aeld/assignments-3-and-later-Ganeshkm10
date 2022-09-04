@@ -25,12 +25,12 @@ int main(int argc,char *argv[])
    
   }
 
-  fd = open( argv[1] , O_RDWR, 0644);
+  fd = open( argv[1] , O_CREAT | O_RDWR, 0644);
   
   if(fd == -1)
   {
    syslog(LOG_ERR, "Error opening file %s: %s \n",argv[1], strerror(errno));
-   printf(" File directory is not found \n");
+   printf(" File  is not found \n");
    return 1;
   }
   
