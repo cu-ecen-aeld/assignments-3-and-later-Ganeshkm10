@@ -1,4 +1,5 @@
 .DEFAULT_GOAL := writer
+CROSS_COMPILE = 
 
 writer: writer.o
 	$(CROSS_COMPILE)-gcc writer.o -o writer
