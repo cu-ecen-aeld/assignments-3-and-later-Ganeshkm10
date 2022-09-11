@@ -135,6 +135,7 @@ cp autorun-qemu.sh "${OUTDIR}/rootfs/home"
 # TODO: Chown the root directory
 
 echo "Change the ownership to root"
+
 cd ${OUTDIR}/rootfs
 sudo chown -R root:root *
 
