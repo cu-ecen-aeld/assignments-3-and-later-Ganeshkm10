@@ -122,7 +122,6 @@ fi
   make clean
   make CROSS_COMPILE=${CROSS_COMPILE}
 
-
 # TODO: Copy the finder related scripts and executables to the /home directory
 # on the target rootfs
 
