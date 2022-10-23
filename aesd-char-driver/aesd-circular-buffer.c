@@ -65,33 +65,47 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
 * Any necessary locking must be handled by the caller
 * Any memory referenced in @param add_entry must be allocated by and/or must have a lifetime managed by the caller.
 */
-void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const struct aesd_buffer_entry *add_entry)
+const char * aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const struct aesd_buffer_entry *add_entry)
 {   
     
+    /**
+    * TODO: implement per description 
+    */
     
-    // Copy the aesd_buffer_entry to the array of struct present inside the aesd_circular_buffer
-    buffer->entry[buffer->in_offs] = *add_entry; //not handling empty condition, So directly add an entry without checking anything
-
-    //check for full condition:
+    const char* ret_entry = NULL;
+    
+    if((buffer == NULL)||(add_entry == NULL))
+    {
+    	return ret_entry;
+    }
+    
     if(buffer->full)
     {
-        buffer->out_offs = (buffer->out_offs+1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; 
-        buffer->in_offs = (buffer->in_offs+1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+       ret_entry = buffer->entry[buffer->out_offs].buffptr;
+    }
+    
+    buffer->entry[buffer->in_offs] = *add_entry;
+    
+    if(buffer->full ==  true)
+    {
+	buffer->out_offs = (buffer->out_offs + 1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+	buffer->in_offs = (buffer->in_offs + 1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; 
     }
     else
     {
-        buffer->in_offs = (buffer->in_offs+1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+    	buffer->in_offs = (buffer->in_offs + 1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; 
     }
-    // set full condition flag
+    
     if(buffer->in_offs == buffer->out_offs)
     {
-        buffer->full = true;
+    	buffer->full = true;
     }
     else
     {
-        buffer->full = false;
-    }
-
+    	buffer->full = false;
+    } 
+    
+    return ret_entry;  
 }
 
 /**
