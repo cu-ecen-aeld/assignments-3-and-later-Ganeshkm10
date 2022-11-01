@@ -29,6 +29,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <poll.h>
+#include "aesd_ioctl.h"
 
 
 #define USE_AESD_CHAR_DEVICE 1
@@ -44,7 +45,7 @@
 #define BACKLOG 10
 
 
-
+const char * ioctl_aesdchar = "AESDCHAR_IOCSEEKTO:";
 
 typedef struct 
 {
@@ -222,6 +223,7 @@ void* thread_func(void* thread_params)
 	{  
 	    break; 
 	} 
+    
 	
         counter++;
         client_read_buf = (char*)realloc(client_read_buf, (counter * buffer_len));
@@ -242,53 +244,73 @@ void* thread_func(void* thread_params)
     {
 	syslog(LOG_ERR, "failed to open a file:%d\n", errno);
     }
+    //Handling IOCTL, Preferrably write a separate func.
+    if(strncmp(client_read_buf, ioctl_aesdchar, strlen(ioctl_aesdchar))==0)
+    {
+        struct aesd_seekto seekto;
+        syslog(LOG_DEBUG,"AESDCHAR_IOCSEEKTO is received\n");
+        char x[2]={"\0"};
+        char y[2]= {"\0"};
+        int X=0;int Y=0;
+        memcpy(&x[0],(client_read_buf+strlen(ioctl_aesdchar)),1);//copying X
+        memcpy(&y[0],(client_read_buf+strlen(ioctl_aesdchar))+2,1);//Copying Y
+        X = atoi(x);//converting into int
+        Y = atoi(y);
+        seekto.write_cmd = X;
+        seekto.write_cmd_offset = Y;
+        int result_ret = ioctl(fd, AESDCHAR_IOCSEEKTO, &seekto);
+    }
+    else
+    {
+        int rv1 = pthread_mutex_lock(params->mutex);
+        if(rv1)
+        {
+            syslog(LOG_ERR, "Error in locking the mutex\n\r");
+            free(client_read_buf);
+            params->thread_complete_status = true;
+            pthread_exit(NULL);
+        }
 
-    lseek(fd, 0, SEEK_END);
+        int file_write = write(fd, client_read_buf, curr_pos);
+        if(file_write < 0)
+        {
+            syslog(LOG_ERR, "Writing to file error no: %d\n\r", errno);
+            free(client_read_buf);
+            params->thread_complete_status = true;
+            close(fd);
+            pthread_exit(NULL);
+        }
+
+        // lseek(fd, 0, SEEK_SET); 
+
+        rv1 = pthread_mutex_unlock(params->mutex);
+        if(rv1)
+        {
+            syslog(LOG_ERR, "Error in unlocking the mutex\n\r");
+            free(client_read_buf);
+            params->thread_complete_status = true;
+            pthread_exit(NULL);
+        }
+
+    }
+    // lseek(fd, 0, SEEK_END);
 	
-    int rv1 = pthread_mutex_lock(params->mutex);
-    if(rv1)
-    {
-        syslog(LOG_ERR, "Error in locking the mutex\n\r");
-        free(client_read_buf);
-        params->thread_complete_status = true;
-        pthread_exit(NULL);
-    }
+    
 
-    int file_write = write(fd, client_read_buf, curr_pos);
-    if(file_write < 0)
-    {
-        syslog(LOG_ERR, "Writing to file error no: %d\n\r", errno);
-        free(client_read_buf);
-        params->thread_complete_status = true;
-        close(fd);
-        pthread_exit(NULL);
-    }
-
-    lseek(fd, 0, SEEK_SET); 
-
-    rv1 = pthread_mutex_unlock(params->mutex);
-    if(rv1)
-    {
-        syslog(LOG_ERR, "Error in unlocking the mutex\n\r");
-        free(client_read_buf);
-        params->thread_complete_status = true;
-        pthread_exit(NULL);
-    }
-
-    close(fd);
+    // close(fd);
 
     int read_offset = 0;
     
-    int fd_dev = open(WRITE_FILE_PATH, O_RDWR | O_APPEND, 0644);
-    if(fd_dev < 0)
-    {
-        free(client_read_buf);
-        params->thread_complete_status = true;
-        pthread_exit(NULL);    
-    }
+    // int fd_dev = open(WRITE_FILE_PATH, O_RDWR | O_APPEND, 0644);
+    // if(fd_dev < 0)
+    // {
+    //     free(client_read_buf);
+    //     params->thread_complete_status = true;
+    //     pthread_exit(NULL);    
+    // }
 
 
-    lseek(fd_dev, read_offset, SEEK_SET);
+    // lseek(fd, read_offset, SEEK_SET);
 
     char* client_write_buf = (char*)malloc(sizeof(char) * buffer_len);
 
@@ -302,7 +324,7 @@ void* thread_func(void* thread_params)
     while(1) 
     {
     
-        rv1 = pthread_mutex_lock(params->mutex);
+        int rv1 = pthread_mutex_lock(params->mutex);
         
         if(rv1)
     	{
@@ -313,7 +335,7 @@ void* thread_func(void* thread_params)
             pthread_exit(NULL);
     	}
     	
-    	int read_bytes = read(fd_dev, &client_write_buf[curr_pos], 1);
+    	int read_bytes = read(fd, &client_write_buf[curr_pos], 1);
     	
         rv1 = pthread_mutex_unlock(params->mutex);   
        
@@ -369,7 +391,7 @@ void* thread_func(void* thread_params)
         }
     }    	
         
-    close(fd_dev);   
+    close(fd);   
     
     free(client_write_buf);
     free(client_read_buf);     
